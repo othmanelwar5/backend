@@ -3,7 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.api.routes import orders
-import app.models  # noqa: F401  — register models for Alembic
 
 app = FastAPI(title="Mizan API", version="1.0.0")
 
