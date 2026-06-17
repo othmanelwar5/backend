@@ -60,15 +60,19 @@ async def check_ip(ip_address: str, phone: Optional[str] = None) -> GeoCheckResu
     If phone is whitelisted, bypasses all checks.
     If MaxMind is disabled or credentials are missing, allows by default.
     """
+    print("[ORDER-DEBUG] step-11a geo check started", {"ip": ip_address, "has_phone": bool(phone)})
     if phone and is_phone_whitelisted(phone):
         logger.info("Phone %s is whitelisted, bypassing geo check", phone[-4:])
+        print("[ORDER-DEBUG] step-11b geo check bypassed by whitelisted phone")
         return GeoCheckResult(allowed=True, reason="whitelisted_phone")
 
     if not settings.MAXMIND_ENABLED:
+        print("[ORDER-DEBUG] step-11b geo check skipped: maxmind disabled")
         return GeoCheckResult(allowed=True, reason="maxmind_disabled")
 
     if not settings.MAXMIND_ACCOUNT_ID or not settings.MAXMIND_LICENSE_KEY:
         logger.warning("MaxMind credentials not configured, skipping geo check")
+        print("[ORDER-DEBUG] step-11b geo check skipped: missing MaxMind credentials")
         return GeoCheckResult(allowed=True, reason="no_credentials")
 
     url = MAXMIND_INSIGHTS_URL.format(ip=ip_address)

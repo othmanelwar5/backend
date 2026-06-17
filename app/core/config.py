@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     FRONTEND_ORIGIN: str = "https://mymizan.shop"
 
     DATABASE_URL: str = "postgresql+psycopg://mymizan:CHANGE_ME@localhost:5432/mymizan"
+    RUN_MIGRATIONS_ON_STARTUP: bool = True
 
     ORDER_WEBHOOK_URL: str = ""
     ORDER_WEBHOOK_SECRET: str = ""

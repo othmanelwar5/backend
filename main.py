@@ -1,10 +1,31 @@
+from __future__ import annotations
+
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import inspect, text
 
-from app.core.config import settings
 from app.api.routes import orders
+from app.core.config import settings
+from app.db.migrations import initialize_database
+from app.db.session import engine
+from app.schemas.order import HealthOut
 
-app = FastAPI(title="Mizan API", version="1.0.0")
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logging.basicConfig(level=logging.INFO)
+    logger.info("Starting Mizan API (env=%s)", settings.APP_ENV)
+    initialize_database(engine)
+    yield
+    logger.info("Shutting down Mizan API")
+
+
+app = FastAPI(title="Mizan API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -14,9 +35,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(orders.router, prefix="/api")
+app.include_router(orders.router)
 
 
-@app.get("/health")
+@app.get("/health", response_model=HealthOut)
 async def health():
-    return {"ok": True}
+    with engine.connect() as connection:
+        connection.execute(text("SELECT 1"))
+        tables = sorted(inspect(engine).get_table_names())
+
+    return HealthOut(ok=True, database="connected", tables=tables)
