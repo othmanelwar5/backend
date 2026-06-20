@@ -31,7 +31,8 @@ REQUIRED_TABLES = frozenset(
 def _alembic_config() -> Config:
     backend_root = Path(__file__).resolve().parents[2]
     config = Config(str(backend_root / "alembic.ini"))
-    config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+    url = settings.DATABASE_URL.replace("%", "%%")
+    config.set_main_option("sqlalchemy.url", url)
     return config
 
 
