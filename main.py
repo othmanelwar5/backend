@@ -1,24 +1,35 @@
 from __future__ import annotations
 
 import logging
+import threading
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy import inspect, text
 
 from app.api.routes import orders
 from app.core.config import settings
+from app.db.bootstrap import bootstrap_database
 from app.db.session import engine
 from app.schemas.order import HealthOut
 
 logger = logging.getLogger(__name__)
 
 
+def _bootstrap_in_background() -> None:
+    try:
+        bootstrap_database()
+    except Exception:
+        logger.exception("Background database bootstrap failed")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logging.basicConfig(level=logging.INFO)
     logger.info("Starting Mizan API (env=%s)", settings.APP_ENV)
+    threading.Thread(target=_bootstrap_in_background, name="db-bootstrap", daemon=True).start()
     yield
     logger.info("Shutting down Mizan API")
 
@@ -41,10 +52,17 @@ async def health_live():
     return {"ok": True}
 
 
-@app.get("/health", response_model=HealthOut)
+@app.get("/health")
 async def health():
-    with engine.connect() as connection:
-        connection.execute(text("SELECT 1"))
-        tables = sorted(inspect(engine).get_table_names())
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+            tables = sorted(inspect(engine).get_table_names())
 
-    return HealthOut(ok=True, database="connected", tables=tables)
+        return HealthOut(ok=True, database="connected", tables=tables)
+    except Exception as exc:
+        logger.warning("Health check database probe failed: %s", exc)
+        return JSONResponse(
+            status_code=503,
+            content={"ok": False, "database": "disconnected", "detail": str(exc)},
+        )
