@@ -9,7 +9,7 @@ from sqlalchemy import inspect, text
 
 from app.api.routes import orders
 from app.core.config import settings
-from app.db.migrations import initialize_database
+from app.db.migrations import verify_tables
 from app.db.session import engine
 from app.schemas.order import HealthOut
 
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     logging.basicConfig(level=logging.INFO)
     logger.info("Starting Mizan API (env=%s)", settings.APP_ENV)
-    initialize_database(engine)
+    verify_tables(engine)
     yield
     logger.info("Shutting down Mizan API")
 
@@ -29,7 +29,7 @@ app = FastAPI(title="Mizan API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.FRONTEND_ORIGIN, "http://localhost:3000"],
+    allow_origins=[settings.FRONTEND_ORIGIN, "http://localhost:3000", "http://127.0.0.1:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

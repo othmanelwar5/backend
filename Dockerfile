@@ -10,6 +10,6 @@ RUN chmod +x start.sh
 
 EXPOSE 80
 
-ENV RUN_MIGRATIONS_ON_STARTUP=true
+ENV RUN_MIGRATIONS_ON_STARTUP=false
 
 CMD ["./start.sh"]
