@@ -36,6 +36,11 @@ app.add_middleware(
 app.include_router(orders.router)
 
 
+@app.get("/health/live")
+async def health_live():
+    return {"ok": True}
+
+
 @app.get("/health", response_model=HealthOut)
 async def health():
     with engine.connect() as connection:
