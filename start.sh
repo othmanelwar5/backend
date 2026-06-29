@@ -1,11 +1,10 @@
 #!/bin/sh
 set -e
 
-echo "==> Running database migrations..."
-timeout "${MIGRATION_TIMEOUT_SECONDS:-60}" alembic upgrade head
+echo "==> Bootstrapping database..."
+python -m app.db.bootstrap
 
-# Migrations are a pre-start step. The FastAPI process should only verify the
-# schema so app startup cannot block behind Alembic and keep the proxy at 502.
+# Migrations run only in the bootstrap step above.
 export RUN_MIGRATIONS_ON_STARTUP=false
 
 echo "==> Starting Uvicorn..."

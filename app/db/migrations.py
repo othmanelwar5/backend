@@ -12,6 +12,8 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+HEAD_REVISION = "001_initial_schema"
+
 REQUIRED_TABLES = frozenset(
     {
         "products",
@@ -40,6 +42,12 @@ def run_migrations() -> None:
     logger.info("Running Alembic migrations (upgrade head)")
     command.upgrade(_alembic_config(), "head")
     logger.info("Alembic migrations completed")
+
+
+def stamp_head() -> None:
+    logger.info("Stamping Alembic head at %s", HEAD_REVISION)
+    command.stamp(_alembic_config(), HEAD_REVISION)
+    logger.info("Alembic stamp completed")
 
 
 def verify_tables(engine: Engine) -> None:
