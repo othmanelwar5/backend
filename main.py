@@ -9,7 +9,6 @@ from sqlalchemy import inspect, text
 
 from app.api.routes import orders
 from app.core.config import settings
-from app.db.migrations import verify_tables
 from app.db.session import engine
 from app.schemas.order import HealthOut
 
@@ -20,7 +19,6 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     logging.basicConfig(level=logging.INFO)
     logger.info("Starting Mizan API (env=%s)", settings.APP_ENV)
-    verify_tables(engine)
     yield
     logger.info("Shutting down Mizan API")
 

@@ -1,7 +1,10 @@
 from __future__ import annotations
 
-from pydantic_settings import BaseSettings
 from pydantic import Field
+from pydantic_settings import BaseSettings
+from sqlalchemy.engine import make_url
+
+EASYPANEL_POSTGRES_HOST = "mymizan_database"
 
 
 class Settings(BaseSettings):
@@ -12,7 +15,7 @@ class Settings(BaseSettings):
     FRONTEND_ORIGIN: str = "https://mymizan.shop"
 
     DATABASE_URL: str = "postgresql+psycopg://mymizan:CHANGE_ME@localhost:5432/mymizan"
-    RUN_MIGRATIONS_ON_STARTUP: bool = True
+    RUN_MIGRATIONS_ON_STARTUP: bool = False
 
     ORDER_WEBHOOK_URL: str = ""
     ORDER_WEBHOOK_SECRET: str = ""
@@ -49,4 +52,26 @@ class Settings(BaseSettings):
     CAPI_TEST_MODE: bool = False
 
 
+def normalize_database_url(raw_url: str) -> str:
+    url = raw_url.strip()
+
+    if url.startswith("postgres://"):
+        url = "postgresql+psycopg://" + url[len("postgres://") :]
+    elif url.startswith("postgresql://") and not url.startswith("postgresql+"):
+        url = "postgresql+psycopg://" + url[len("postgresql://") :]
+
+    parsed = make_url(url)
+    if parsed.host == "HOST":
+        parsed = parsed.set(host=EASYPANEL_POSTGRES_HOST)
+
+    if parsed.username == "USER" or parsed.password == "PASSWORD" or parsed.database == "DBNAME":
+        raise ValueError(
+            "DATABASE_URL still contains placeholder credentials or database name. "
+            "Set the real PostgreSQL username, password, and database name in EasyPanel."
+        )
+
+    return parsed.render_as_string(hide_password=False)
+
+
 settings = Settings()
+settings.DATABASE_URL = normalize_database_url(settings.DATABASE_URL)
