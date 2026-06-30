@@ -12,7 +12,7 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-HEAD_REVISION = "001_initial_schema"
+HEAD_REVISION = "002_product_sku"
 
 REQUIRED_TABLES = frozenset(
     {

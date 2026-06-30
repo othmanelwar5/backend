@@ -16,7 +16,7 @@ PRICE_BY_QUANTITY = {1: "price_1", 2: "price_2", 3: "price_3"}
 
 def _generate_order_number(db: Session) -> str:
     today = datetime.now(timezone.utc).strftime("%Y%m%d")
-    prefix = f"MYM-{today}-"
+    prefix = f"mizan{today}"
     count = db.scalar(
         select(func.count()).select_from(Order).where(Order.order_number.like(f"{prefix}%"))
     )

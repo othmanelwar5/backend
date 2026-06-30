@@ -49,6 +49,12 @@ def bootstrap_database() -> None:
             verify_tables(engine)
             return
 
+        if revision:
+            logger.info("Database at revision %r; upgrading to %s", revision, HEAD_REVISION)
+            run_migrations()
+            verify_tables(engine)
+            return
+
         logger.info(
             "Schema tables present but Alembic revision is %r; stamping head",
             revision,

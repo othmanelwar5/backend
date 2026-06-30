@@ -12,3 +12,13 @@ def normalize_phone(raw: str) -> str:
         raise ValueError("invalid_ksa_phone")
 
     return f"+966{digits}"
+
+
+def phone_to_sheet_digits(phone_e164: str) -> str:
+    """Format stored E.164 phone for Google Sheets (9665XXXXXXXX, no plus)."""
+    digits = "".join(char for char in phone_e164.strip() if char.isdigit())
+    if digits.startswith("966"):
+        return digits
+    if len(digits) == 9 and digits.startswith("5"):
+        return f"966{digits}"
+    return digits

@@ -18,7 +18,6 @@ class Settings(BaseSettings):
     RUN_MIGRATIONS_ON_STARTUP: bool = False
 
     ORDER_WEBHOOK_URL: str = ""
-    ORDER_WEBHOOK_SECRET: str = ""
 
     # MaxMind GeoIP2 Precision Insights
     MAXMIND_ACCOUNT_ID: str = ""

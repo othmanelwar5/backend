@@ -15,6 +15,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE TABLE IF NOT EXISTS products (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     slug        VARCHAR(100)  NOT NULL,
+    sku         VARCHAR(30)   NOT NULL,
     name_ar     VARCHAR(150)  NOT NULL,
     name_en     VARCHAR(150),
     price_1     INTEGER       NOT NULL DEFAULT 199,
@@ -26,6 +27,7 @@ CREATE TABLE IF NOT EXISTS products (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS ix_products_slug ON products (slug);
+CREATE UNIQUE INDEX IF NOT EXISTS ix_products_sku ON products (sku);
 
 -- -----------------------------------------------------------------------------
 -- customers
@@ -190,16 +192,16 @@ CREATE TABLE IF NOT EXISTS alembic_version (
 -- -----------------------------------------------------------------------------
 -- seed data: default products
 -- -----------------------------------------------------------------------------
-INSERT INTO products (slug, name_ar, name_en, price_1, price_2, price_3, active)
-SELECT 'd3-k2-gummies', 'علكة D3+K2', 'D3+K2 Gummies', 199, 279, 349, true
+INSERT INTO products (slug, sku, name_ar, name_en, price_1, price_2, price_3, active)
+SELECT 'd3-k2-gummies', 'MZN-D3K2-8417', 'حلوى فيتامين D3 و K2', 'D3+K2 Gummies', 199, 279, 349, true
 WHERE NOT EXISTS (SELECT 1 FROM products WHERE slug = 'd3-k2-gummies');
 
-INSERT INTO products (slug, name_ar, name_en, price_1, price_2, price_3, active)
-SELECT 'sleep-tea', 'شاي النوم', 'Sleep Tea', 199, 279, 349, true
+INSERT INTO products (slug, sku, name_ar, name_en, price_1, price_2, price_3, active)
+SELECT 'sleep-tea', 'MZN-SLP-2935', 'شاي الأشواغاندا والمغنيسيوم', 'Sleep Tea', 199, 279, 349, true
 WHERE NOT EXISTS (SELECT 1 FROM products WHERE slug = 'sleep-tea');
 
-INSERT INTO products (slug, name_ar, name_en, price_1, price_2, price_3, active)
-SELECT 'probiotic-fiber-gummies', 'علكة البروبيوتيك والألياف', 'Probiotic Fiber Gummies', 199, 279, 349, true
+INSERT INTO products (slug, sku, name_ar, name_en, price_1, price_2, price_3, active)
+SELECT 'probiotic-fiber-gummies', 'MZN-PRB-6102', 'حلوى البروبيوتيك والألياف', 'Probiotic Fiber Gummies', 199, 279, 349, true
 WHERE NOT EXISTS (SELECT 1 FROM products WHERE slug = 'probiotic-fiber-gummies');
 
 INSERT INTO alembic_version (version_num)

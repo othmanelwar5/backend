@@ -2,19 +2,25 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_client_ip, verify_order_geo
 from app.db.session import get_db
 from app.schemas.order import OrderCreateIn, OrderCreateOut, OrderOut
 from app.services import orders as order_service
+from app.services.webhook import dispatch_order_webhook
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
 
 @router.post("", response_model=OrderCreateOut, status_code=status.HTTP_201_CREATED)
-async def create_order(body: OrderCreateIn, request: Request, db: Session = Depends(get_db)):
+async def create_order(
+    body: OrderCreateIn,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
     print(
         "[ORDER-DEBUG] step-10 backend route received request",
         {
@@ -32,6 +38,7 @@ async def create_order(body: OrderCreateIn, request: Request, db: Session = Depe
     print("[ORDER-DEBUG] step-12 geo check passed")
 
     order = order_service.create_order(db, body)
+    background_tasks.add_task(dispatch_order_webhook, order.id)
     print(
         "[ORDER-DEBUG] step-18 route returning created order",
         {"order_number": order.order_number, "order_id": str(order.id)},
