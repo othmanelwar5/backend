@@ -4,9 +4,15 @@ FastAPI dependencies for geo-fraud checking on order endpoints.
 
 from __future__ import annotations
 
-from fastapi import Depends, HTTPException, Request, status
+import secrets
 
+from fastapi import Depends, HTTPException, Request, status
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+
+from app.core.config import settings
 from app.services.geocheck import GeoCheckResult, check_ip
+
+admin_security = HTTPBasic(auto_error=False)
 
 
 def get_client_ip(request: Request) -> str:
@@ -71,3 +77,29 @@ async def verify_order_geo(ip: str, phone: str) -> GeoCheckResult:
         )
 
     return result
+
+
+def require_admin(credentials: HTTPBasicCredentials | None = Depends(admin_security)) -> str:
+    if not settings.ADMIN_USERNAME or not settings.ADMIN_PASSWORD:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"error": "admin_auth_not_configured"},
+        )
+
+    if credentials is None:
+        raise_admin_unauthorized()
+
+    username_ok = secrets.compare_digest(credentials.username, settings.ADMIN_USERNAME)
+    password_ok = secrets.compare_digest(credentials.password, settings.ADMIN_PASSWORD)
+    if not username_ok or not password_ok:
+        raise_admin_unauthorized()
+
+    return credentials.username
+
+
+def raise_admin_unauthorized() -> None:
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail={"error": "invalid_admin_credentials"},
+        headers={"WWW-Authenticate": "Basic"},
+    )

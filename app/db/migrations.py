@@ -12,7 +12,7 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-HEAD_REVISION = "002_product_sku"
+HEAD_REVISION = "003_admin_dashboard_analytics"
 
 REQUIRED_TABLES = frozenset(
     {
@@ -25,6 +25,7 @@ REQUIRED_TABLES = frozenset(
         "events",
         "pixel_events",
         "webhook_logs",
+        "analytics_events",
         "alembic_version",
     }
 )

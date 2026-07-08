@@ -34,6 +34,8 @@ class GeoCheckResult:
     is_hosting: bool = False
     risk_score: float = 0.0
     reason: Optional[str] = None
+    provider: Optional[str] = None
+    provider_payload: Optional[dict] = None
 
 
 def normalize_phone_for_whitelist(phone: str) -> str:
@@ -94,7 +96,10 @@ async def check_ip(ip_address: str, phone: Optional[str] = None) -> GeoCheckResu
             return GeoCheckResult(allowed=True, reason="maxmind_api_error")
 
         data = response.json()
-        return _evaluate_response(data)
+        result = _evaluate_response(data)
+        if result.allowed:
+            result = await _apply_secondary_vpn_check(ip_address, result)
+        return result
 
     except httpx.TimeoutException:
         logger.error("MaxMind API timeout for IP %s", ip_address)
@@ -102,6 +107,79 @@ async def check_ip(ip_address: str, phone: Optional[str] = None) -> GeoCheckResu
     except Exception as e:
         logger.exception("MaxMind unexpected error: %s", str(e))
         return GeoCheckResult(allowed=True, reason="maxmind_exception")
+
+
+async def _apply_secondary_vpn_check(ip_address: str, result: GeoCheckResult) -> GeoCheckResult:
+    if not settings.VPN_DETECTION_API_URL or not settings.VPN_DETECTION_API_KEY:
+        return result
+
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            response = await client.get(
+                settings.VPN_DETECTION_API_URL,
+                params={"ip": ip_address},
+                headers={"Authorization": f"Bearer {settings.VPN_DETECTION_API_KEY}"},
+            )
+
+        if response.status_code >= 400:
+            logger.error("VPN provider error: status=%d body=%s", response.status_code, response.text[:200])
+            return result
+
+        payload = response.json()
+        verdict = _evaluate_secondary_vpn_payload(payload)
+        result.provider = "secondary_vpn_provider"
+        result.provider_payload = payload
+        result.is_vpn = result.is_vpn or verdict["is_vpn"]
+        result.is_proxy = result.is_proxy or verdict["is_proxy"]
+        result.is_tor = result.is_tor or verdict["is_tor"]
+        result.is_hosting = result.is_hosting or verdict["is_hosting"]
+        result.risk_score = max(result.risk_score, verdict["risk_score"])
+
+        if settings.GEO_BLOCK_VPN and (verdict["is_vpn"] or verdict["is_proxy"] or verdict["is_tor"]):
+            result.allowed = False
+            result.reason = "secondary_provider_anonymous_ip"
+        elif settings.GEO_BLOCK_HIGH_RISK and verdict["is_hosting"]:
+            result.allowed = False
+            result.reason = "secondary_provider_hosting"
+        elif settings.GEO_BLOCK_HIGH_RISK and verdict["risk_score"] >= settings.GEO_RISK_SCORE_THRESHOLD:
+            result.allowed = False
+            result.reason = f"secondary_provider_high_risk:{verdict['risk_score']}"
+
+        return result
+    except httpx.TimeoutException:
+        logger.error("VPN provider timeout for IP %s", ip_address)
+        return result
+    except Exception as exc:
+        logger.exception("VPN provider unexpected error: %s", str(exc))
+        return result
+
+
+def _truthy_from_payload(data: dict, *keys: str) -> bool:
+    current = data
+    for key in keys:
+        if not isinstance(current, dict):
+            return False
+        current = current.get(key)
+    return bool(current)
+
+
+def _evaluate_secondary_vpn_payload(data: dict) -> dict:
+    security = data.get("security") if isinstance(data.get("security"), dict) else {}
+    risk = data.get("risk") if isinstance(data.get("risk"), dict) else {}
+    fraud_score = data.get("fraud_score", data.get("risk_score", risk.get("score", 0.0)))
+
+    try:
+        risk_score = float(fraud_score or 0.0)
+    except (TypeError, ValueError):
+        risk_score = 0.0
+
+    return {
+        "is_vpn": bool(data.get("vpn") or security.get("vpn") or _truthy_from_payload(data, "privacy", "vpn")),
+        "is_proxy": bool(data.get("proxy") or security.get("proxy") or _truthy_from_payload(data, "privacy", "proxy")),
+        "is_tor": bool(data.get("tor") or security.get("tor") or _truthy_from_payload(data, "privacy", "tor")),
+        "is_hosting": bool(data.get("hosting") or security.get("hosting") or data.get("datacenter")),
+        "risk_score": risk_score,
+    }
 
 
 def _evaluate_response(data: dict) -> GeoCheckResult:
