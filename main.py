@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import inspect, text
 
-from app.api.routes import orders
+from app.api.routes import admin, events, orders
 from app.core.config import settings
 from app.db.bootstrap import bootstrap_database
 from app.db.session import engine
@@ -38,13 +38,15 @@ app = FastAPI(title="Mizan API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.FRONTEND_ORIGIN, "http://localhost:3000", "http://127.0.0.1:3000"],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 app.include_router(orders.router)
+app.include_router(events.router)
+app.include_router(admin.router)
 
 
 @app.get("/health/live")

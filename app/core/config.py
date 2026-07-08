@@ -19,6 +19,10 @@ class Settings(BaseSettings):
 
     ORDER_WEBHOOK_URL: str = ""
 
+    # Admin dashboard
+    ADMIN_USERNAME: str = ""
+    ADMIN_PASSWORD: str = ""
+
     # MaxMind GeoIP2 Precision Insights
     MAXMIND_ACCOUNT_ID: str = ""
     MAXMIND_LICENSE_KEY: str = ""
@@ -30,8 +34,13 @@ class Settings(BaseSettings):
     GEO_BLOCK_HIGH_RISK: bool = True
     GEO_RISK_SCORE_THRESHOLD: float = 50.0
 
+    # Optional secondary VPN/proxy provider. Expected to return JSON with common
+    # fields such as vpn/proxy/tor/hosting/fraud_score/risk_score.
+    VPN_DETECTION_API_URL: str = ""
+    VPN_DETECTION_API_KEY: str = ""
+
     # Whitelisted phone numbers that bypass geo/fraud checks (for testing in prod)
-    WHITELISTED_PHONES: list[str] = Field(default=["055000000"])
+    WHITELISTED_PHONES: list[str] = Field(default=["0550000000"])
 
     # Meta CAPI
     META_PIXEL_ID: str = ""
