@@ -19,6 +19,11 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     op.execute(sa.text('CREATE EXTENSION IF NOT EXISTS "pgcrypto"'))
+    # Guard: skip if the table already exists (e.g. manual schema setup)
+    from sqlalchemy import inspect as sa_inspect
+    bind = op.get_bind()
+    if "analytics_events" in sa_inspect(bind).get_table_names():
+        return
     op.create_table(
         "analytics_events",
         sa.Column("id", postgresql.UUID(as_uuid=True), server_default=sa.text("gen_random_uuid()"), nullable=False),
