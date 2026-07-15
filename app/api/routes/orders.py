@@ -9,6 +9,7 @@ from app.api.deps import get_client_ip, verify_order_geo
 from app.db.session import get_db
 from app.schemas.order import OrderCreateIn, OrderCreateOut, OrderOut
 from app.services import orders as order_service
+from app.services.capi import dispatch_purchase_capi
 from app.services.webhook import dispatch_order_webhook
 
 router = APIRouter(prefix="/orders", tags=["orders"])
@@ -39,6 +40,14 @@ async def create_order(
 
     order = order_service.create_order(db, body)
     background_tasks.add_task(dispatch_order_webhook, order.id)
+    if body.tracking is not None:
+        background_tasks.add_task(
+            dispatch_purchase_capi,
+            order.id,
+            body.tracking.model_dump(exclude_none=True),
+            client_ip,
+            request.headers.get("user-agent", ""),
+        )
     print(
         "[ORDER-DEBUG] step-18 route returning created order",
         {"order_number": order.order_number, "order_id": str(order.id)},
