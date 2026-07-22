@@ -18,7 +18,19 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.execute(sa.text('CREATE EXTENSION IF NOT EXISTS "pgcrypto"'))
+    # pgcrypto is needed for gen_random_uuid() on PostgreSQL < 13.
+    # On managed DBs the role may not have CREATE EXTENSION privilege, so
+    # we suppress the error with a PL/pgSQL block rather than letting it
+    # abort the whole migration.
+    op.execute(sa.text("""
+        DO $$ BEGIN
+            CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+        EXCEPTION WHEN insufficient_privilege THEN
+            NULL;  -- extension may already exist or superuser not needed
+        WHEN others THEN
+            NULL;
+        END $$;
+    """))
     # Guard: skip if the table already exists (e.g. manual schema setup)
     from sqlalchemy import inspect as sa_inspect
     bind = op.get_bind()

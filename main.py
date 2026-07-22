@@ -4,7 +4,7 @@ import logging
 import threading
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import inspect, text
@@ -47,6 +47,21 @@ app.add_middleware(
 app.include_router(orders.router)
 app.include_router(events.router)
 app.include_router(admin.router)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """
+    Catch-all handler so that unhandled Python exceptions (DB crashes, etc.)
+    still return a JSON response that passes through CORSMiddleware.
+    Without this, ServerErrorMiddleware returns a bare 500 with no CORS headers,
+    which makes the browser treat it as a network/CORS error instead of a server error.
+    """
+    logger.exception("Unhandled exception on %s %s: %s", request.method, request.url.path, exc)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error", "error": "server_error"},
+    )
 
 
 @app.get("/health/live")

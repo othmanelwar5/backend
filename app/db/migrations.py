@@ -25,8 +25,8 @@ REQUIRED_TABLES = frozenset(
         "events",
         "pixel_events",
         "webhook_logs",
-        "analytics_events",
         "alembic_version",
+        # analytics_events is optional — its absence must never block order processing
     }
 )
 
