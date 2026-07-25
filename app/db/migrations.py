@@ -12,7 +12,7 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-HEAD_REVISION = "003_admin_dashboard_analytics"
+HEAD_REVISION = "004_repair_schema"
 
 REQUIRED_TABLES = frozenset(
     {
@@ -25,8 +25,8 @@ REQUIRED_TABLES = frozenset(
         "events",
         "pixel_events",
         "webhook_logs",
+        "analytics_events",
         "alembic_version",
-        # analytics_events is optional — its absence must never block order processing
     }
 )
 
@@ -51,17 +51,32 @@ def stamp_head() -> None:
     logger.info("Alembic stamp completed")
 
 
+CORE_TABLES = frozenset(
+    {
+        "products",
+        "customers",
+        "orders",
+        "order_items",
+    }
+)
+
+
 def verify_tables(engine: Engine) -> None:
     inspector = inspect(engine)
     existing = set(inspector.get_table_names())
     missing = REQUIRED_TABLES - existing
 
     if missing:
-        raise RuntimeError(
-            f"Database schema incomplete. Missing tables: {', '.join(sorted(missing))}"
-        )
-
-    logger.info("Verified %d required tables exist", len(REQUIRED_TABLES) - 1)
+        # Only raise if core order-processing tables are missing.
+        # Analytics / optional tables log a warning but don't block startup.
+        core_missing = CORE_TABLES & missing
+        if core_missing:
+            raise RuntimeError(
+                f"Core tables missing — cannot process orders: {', '.join(sorted(core_missing))}"
+            )
+        logger.warning("Non-critical tables missing: %s", ", ".join(sorted(missing)))
+    else:
+        logger.info("Verified %d required tables exist", len(REQUIRED_TABLES) - 1)
 
 
 def initialize_database(engine: Engine) -> None:
