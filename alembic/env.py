@@ -40,7 +40,14 @@ def run_migrations_online() -> None:
     with connectable.connect() as connection:
         connection.execute(text("SET lock_timeout = '30s'"))
         connection.execute(text("SET statement_timeout = '120s'"))
-        context.configure(connection=connection, target_metadata=target_metadata)
+        # Without this, every revision shares one transaction: a single failing
+        # revision rolls back the ones that already succeeded and the version
+        # stays pinned to the old revision on every restart.
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            transaction_per_migration=True,
+        )
 
         with context.begin_transaction():
             context.run_migrations()

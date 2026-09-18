@@ -119,47 +119,56 @@ def create_order(db: Session, payload: OrderCreateIn) -> Order:
         ) from exc
 
     print("[ORDER-DEBUG] step-13a phone normalized", {"phone_e164": phone_e164})
-    lines, subtotal = _resolve_line_items(db, payload)
-    customer = _get_or_create_customer(db, payload.customer_name, phone_e164)
-    now = datetime.now(timezone.utc)
 
-    order = Order(
-        order_number=_generate_order_number(db),
-        customer_id=customer.id,
-        customer_name=payload.customer_name,
-        phone=phone_e164,
-        city=payload.city,
-        status=OrderStatus.PENDING,
-        subtotal=subtotal,
-        total=subtotal,
-    )
-    db.add(order)
-    print("[ORDER-DEBUG] step-16 order added, flushing")
-    db.flush()
-    print("[ORDER-DEBUG] step-16a order flushed", {"order_id": str(order.id), "order_number": order.order_number})
+    try:
+        lines, subtotal = _resolve_line_items(db, payload)
+        customer = _get_or_create_customer(db, payload.customer_name, phone_e164)
+        now = datetime.now(timezone.utc)
 
-    for line in lines:
-        db.add(
-            OrderItem(
-                order_id=order.id,
-                product_id=line["product"].id,
-                quantity=line["quantity"],
-                unit_price=line["unit_price"],
-                total_price=line["total_price"],
-            )
+        order = Order(
+            order_number=_generate_order_number(db),
+            customer_id=customer.id,
+            customer_name=payload.customer_name,
+            phone=phone_e164,
+            city=payload.city,
+            status=OrderStatus.PENDING,
+            subtotal=subtotal,
+            total=subtotal,
         )
+        db.add(order)
+        print("[ORDER-DEBUG] step-16 order added, flushing")
+        db.flush()
+        print("[ORDER-DEBUG] step-16a order flushed", {"order_id": str(order.id), "order_number": order.order_number})
 
-    customer.total_orders += 1
-    customer.name = payload.customer_name
-    customer.last_order_date = now
-    if customer.first_order_date is None:
-        customer.first_order_date = now
+        for line in lines:
+            db.add(
+                OrderItem(
+                    order_id=order.id,
+                    product_id=line["product"].id,
+                    quantity=line["quantity"],
+                    unit_price=line["unit_price"],
+                    total_price=line["total_price"],
+                )
+            )
 
-    print("[ORDER-DEBUG] step-17 committing transaction")
-    db.commit()
-    print("[ORDER-DEBUG] step-17a transaction committed")
-    db.refresh(order)
-    return order
+        customer.total_orders += 1
+        customer.name = payload.customer_name
+        customer.last_order_date = now
+        if customer.first_order_date is None:
+            customer.first_order_date = now
+
+        print("[ORDER-DEBUG] step-17 committing transaction")
+        db.commit()
+        print("[ORDER-DEBUG] step-17a transaction committed")
+        db.refresh(order)
+        return order
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as exc:
+        print("[ORDER-DEBUG] stop-10 database failure in create_order", {"error": repr(exc)})
+        db.rollback()
+        raise
 
 
 def list_orders(db: Session, *, limit: int = 50, offset: int = 0) -> list[Order]:

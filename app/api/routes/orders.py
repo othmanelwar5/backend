@@ -4,6 +4,7 @@ import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.api.deps import get_client_ip, verify_order_geo
 from app.db.session import get_db
@@ -38,7 +39,7 @@ async def create_order(
     await verify_order_geo(ip=client_ip, phone=body.phone)
     print("[ORDER-DEBUG] step-12 geo check passed")
 
-    order = order_service.create_order(db, body)
+    order = await run_in_threadpool(order_service.create_order, db, body)
     background_tasks.add_task(dispatch_order_webhook, order.id)
     if body.tracking is not None:
         background_tasks.add_task(

@@ -8,6 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import inspect, text
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api.routes import admin, events, orders
 from app.core.config import settings
@@ -36,6 +37,30 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Mizan API", version="1.0.0", lifespan=lifespan)
 
+
+class CatchUnhandledErrorsMiddleware(BaseHTTPMiddleware):
+    """Turn unhandled exceptions into a JSON 500 *below* CORSMiddleware.
+
+    An `@app.exception_handler(Exception)` is installed into ServerErrorMiddleware,
+    which sits outside CORSMiddleware, so its response carries no
+    `access-control-allow-origin` header. The browser then discards the response
+    and `fetch()` rejects with a generic network error, hiding the real server
+    error from the storefront. Catching here keeps the response inside CORS.
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        try:
+            return await call_next(request)
+        except Exception as exc:
+            logger.exception("Unhandled exception on %s %s: %s", request.method, request.url.path, exc)
+            return JSONResponse(
+                status_code=500,
+                content={"detail": "Internal server error", "error": "server_error"},
+            )
+
+
+# Added first so it ends up inside CORSMiddleware: error responses get CORS headers.
+app.add_middleware(CatchUnhandledErrorsMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -49,24 +74,33 @@ app.include_router(events.router)
 app.include_router(admin.router)
 
 
-@app.exception_handler(Exception)
-async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    """
-    Catch-all handler so that unhandled Python exceptions (DB crashes, etc.)
-    still return a JSON response that passes through CORSMiddleware.
-    Without this, ServerErrorMiddleware returns a bare 500 with no CORS headers,
-    which makes the browser treat it as a network/CORS error instead of a server error.
-    """
-    logger.exception("Unhandled exception on %s %s: %s", request.method, request.url.path, exc)
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Internal server error", "error": "server_error"},
-    )
-
-
 @app.get("/health/live")
 async def health_live():
     return {"ok": True}
+
+
+@app.get("/health/schema")
+async def health_schema():
+    """Report the schema drift that silently breaks order creation."""
+    try:
+        inspector = inspect(engine)
+        tables = set(inspector.get_table_names())
+        product_columns = (
+            {column["name"] for column in inspector.get_columns("products")}
+            if "products" in tables
+            else set()
+        )
+        missing_tables = sorted({"products", "orders", "order_items", "customers", "analytics_events"} - tables)
+        missing_product_columns = sorted({"slug", "sku", "price_1", "price_2", "price_3", "active"} - product_columns)
+
+        return {
+            "ok": not missing_tables and not missing_product_columns,
+            "missing_tables": missing_tables,
+            "missing_product_columns": missing_product_columns,
+        }
+    except Exception as exc:
+        logger.warning("Schema health probe failed: %s", exc)
+        return JSONResponse(status_code=503, content={"ok": False, "detail": str(exc)})
 
 
 @app.get("/health")
